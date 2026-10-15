@@ -1,0 +1,60 @@
+﻿Sentinel evidence reproduction - 20261015-220222
+PowerShell 5.1.26100.9444 on Microsoft Windows NT 10.0.26200.0
+
+== Python version
+> python.exe --version
+Python 3.14.3
+exit code: 0
+
+== Tests
+> python.exe -m pytest -q -p no:cacheprovider
+........................................................................ [ 51%]
+.....................................................................    [100%]
+141 passed in 62.37s (0:01:02)
+exit code: 0
+
+== Ruff
+> ruff.exe check sentinel tests scripts
+All checks passed!
+exit code: 0
+
+== mypy
+> mypy.exe sentinel
+Success: no issues found in 15 source files
+exit code: 0
+
+== Dashboard JavaScript syntax
+> node.exe --check evidence\repro_20261015-220222\dashboard_script.js
+exit code: 0
+
+== Generate synthetic demo data and baseline
+> python.exe -m sentinel make-demo
+wrote 6 clips + baseline footage to data/demo (manifest.json); source: synthetic (procedurally generated, deterministic seed=7)
+baseline written to data/baseline.json (300 frames)
+exit code: 0
+
+== Run demo timeline (CLI)
+> python.exe -m sentinel run data\demo\demo_timeline.mp4 --out evidence\repro_20261015-220222\cli_run
+{
+ "source": "data\\demo\\demo_timeline.mp4",
+ "input_kind": "synthetic_demo",
+ "frames": 1110,
+ "end_reason": "end_of_file",
+ "final_state": "HEALTHY",
+ "incidents": 4,
+ "mean_latency_ms": 5.07,
+ "max_latency_ms": 33.97,
+ "corrupt_frames": 0,
+ "reconnects": 0,
+ "out_dir": "evidence\\repro_20261015-220222\\cli_run",
+ "error": null,
+ "extra": {}
+}
+exit code: 0
+
+== Summarise run
+> python.exe scripts\summarize_run.py evidence\repro_20261015-220222\cli_run --manifest evidence\repro_20261015-220222\cli_run\demo_manifest.json
+wrote evidence\repro_20261015-220222\cli_run\SUMMARY.md
+exit code: 0
+
+RESULT: all steps succeeded. Evidence folder: evidence\repro_20261015-220222

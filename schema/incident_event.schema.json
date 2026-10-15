@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sentinel.local/schema/incident_event/1.0",
+  "title": "Sentinel incident event",
+  "description": "One line of events.jsonl / one item of GET /api/events. Findings are suspected input degradation, not measured accuracy loss.",
+  "type": "object",
+  "required": ["schema_version", "event_id", "event_type", "emitted_at", "stream_id", "stream_time_s", "health_state", "message", "incident"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"enum": ["incident_opened", "state_changed", "incident_resolved", "incident_unverified", "stream_error", "stream_warning"]},
+    "emitted_at": {"type": "string", "description": "UTC wall-clock ISO 8601"},
+    "stream_id": {"type": "string"},
+    "stream_time_s": {"type": "number", "minimum": 0},
+    "health_state": {"$ref": "#/$defs/state"},
+    "message": {"type": "string"},
+    "incident": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/incident"}]}
+  },
+  "$defs": {
+    "state": {"enum": ["HEALTHY", "DEGRADED", "UNTRUSTED", "RECOVERING"]},
+    "severity": {"enum": ["info", "warning", "critical"]},
+    "category": {"enum": ["low_light", "blur", "obstruction", "framing_change", "processing_latency"]},
+    "check": {
+      "type": "object",
+      "required": ["check", "category", "value", "raw_value", "direction", "enter_threshold", "exit_threshold", "severe_threshold", "active", "severe"],
+      "properties": {
+        "check": {"type": "string"},
+        "category": {"type": "string"},
+        "value": {"type": ["number", "null"], "description": "EMA-smoothed value compared against thresholds"},
+        "raw_value": {"type": ["number", "null"]},
+        "direction": {"enum": ["below", "above"]},
+        "enter_threshold": {"type": "number"},
+        "exit_threshold": {"type": "number"},
+        "severe_threshold": {"type": "number"},
+        "active": {"type": "boolean"},
+        "severe": {"type": "boolean"}
+      }
+    },
+    "detection_window": {
+      "type": "object",
+      "description": "Detection statistics over a stream-time window. Frames without detection data are counted separately, never as zero detections.",
+      "required": ["start_stream_time_s", "end_stream_time_s", "frames", "frames_with_detection_data", "detections_total", "mean_detections_per_frame"],
+      "properties": {
+        "start_stream_time_s": {"type": ["number", "null"]},
+        "end_stream_time_s": {"type": ["number", "null"]},
+        "frames": {"type": "integer", "minimum": 0},
+        "frames_with_detection_data": {"type": "integer", "minimum": 0},
+        "detections_total": {"type": "integer", "minimum": 0},
+        "mean_detections_per_frame": {"type": ["number", "null"]}
+      }
+    },
+    "incident": {
+      "type": "object",
+      "required": ["incident_id", "stream_id", "status", "health_state", "severity", "peak_severity", "opened_at", "opened_stream_time_s", "updated_at", "resolved_at", "resolved_stream_time_s", "suspected_categories", "categories_seen", "measurements_at_open", "latest_measurements", "worst_values", "evidence", "recommended_actions", "transitions", "detection", "detection_context", "recurrence_of", "recurrence_count", "snapshot_path", "claim", "disclaimer"],
+      "additionalProperties": false,
+      "properties": {
+        "incident_id": {"type": "string", "minLength": 1},
+        "stream_id": {"type": "string"},
+        "status": {"enum": ["active", "resolved", "unverified"]},
+        "health_state": {"$ref": "#/$defs/state"},
+        "severity": {"$ref": "#/$defs/severity"},
+        "peak_severity": {"$ref": "#/$defs/severity"},
+        "opened_at": {"type": "string"},
+        "opened_stream_time_s": {"type": "number"},
+        "updated_at": {"type": "string"},
+        "resolved_at": {"type": ["string", "null"]},
+        "resolved_stream_time_s": {"type": ["number", "null"]},
+        "suspected_categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+        "categories_seen": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+        "measurements_at_open": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+        "latest_measurements": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+        "worst_values": {"type": "object", "additionalProperties": {"type": "number"}},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "recommended_actions": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stream_time_s", "from", "to", "reason"],
+            "properties": {
+              "stream_time_s": {"type": "number"},
+              "from": {"$ref": "#/$defs/state"},
+              "to": {"$ref": "#/$defs/state"},
+              "reason": {"type": "string"}
+            }
+          }
+        },
+        "detection": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["detector", "source", "count", "mean_confidence", "by_label"],
+              "properties": {
+                "detector": {"type": "string"},
+                "source": {"enum": ["real_inference", "external_pipeline"], "description": "real_inference = model ran inside Sentinel; external_pipeline = detections supplied by another pipeline (e.g. PipeGen)"},
+                "count": {"type": "integer", "minimum": 0},
+                "mean_confidence": {"type": ["number", "null"]},
+                "by_label": {"type": "object", "additionalProperties": {"type": "integer"}}
+              }
+            }
+          ]
+        },
+        "detection_context": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "required": ["before", "during"],
+              "properties": {
+                "before": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/detection_window"}]},
+                "during": {"$ref": "#/$defs/detection_window"}
+              }
+            }
+          ]
+        },
+        "recurrence_of": {"type": ["string", "null"]},
+        "recurrence_count": {"type": "integer", "minimum": 0},
+        "snapshot_path": {"type": ["string", "null"]},
+        "claim": {"const": "suspected_input_degradation"},
+        "disclaimer": {"type": "string"}
+      }
+    }
+  }
+}

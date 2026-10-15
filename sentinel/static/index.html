@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sentinel Monitor</title>
+<style>
+  :root {
+    --bg: #0f1216; --panel: #171b21; --panel2: #1f2630; --line: #262c35; --text: #e6e9ee; --muted: #9aa4b2;
+    --healthy: #3fb950; --degraded: #f0a020; --untrusted: #e5484d; --recovering: #3d9df3; --focus: #79c0ff;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header.top h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .04em; }
+  .tag { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+  select, button, input[type=text] { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; max-width: 100%; }
+  button.primary { background: #2563eb; border-color: #2563eb; }
+  button:hover:not(:disabled) { filter: brightness(1.15); cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .banners { padding: 0 16px; }
+  .banner { margin-top: 12px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; overflow-wrap: anywhere; }
+  .banner.warn { border-color: var(--degraded); } .banner.err { border-color: var(--untrusted); } .banner.info { border-color: var(--recovering); }
+  code { font-family: var(--mono); background: #0b0e12; padding: 1px 5px; border-radius: 4px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; padding: 16px; }
+  @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 560px) { main { padding: 10px; gap: 10px; } header.top { padding: 10px; } .controls > * { flex: 1 1 auto; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .videoBox { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; overflow: hidden; }
+  #video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #video:not([src]) { display: none; }
+  #videoMsg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--muted); padding: 16px; }
+  .badge { font-size: 11px; font-weight: 600; letter-spacing: .06em; padding: 2px 8px; border-radius: 4px; }
+  .b-synthetic { background: #3a2f0b; color: #f5c451; } .b-real { background: #0d2b45; color: #79c0ff; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  /* health summary */
+  .hs-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .state { font-size: 28px; font-weight: 700; letter-spacing: .04em; }
+  .s-HEALTHY { color: var(--healthy); } .s-DEGRADED { color: var(--degraded); }
+  .s-UNTRUSTED { color: var(--untrusted); } .s-RECOVERING { color: var(--recovering); }
+  .chip { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 2px 8px; border-radius: 10px; border: 1px solid currentColor; text-transform: uppercase; white-space: nowrap; }
+  .sev-ok { color: var(--healthy); } .sev-warning { color: var(--degraded); } .sev-critical { color: var(--untrusted); } .sev-info, .sev-verifying { color: var(--recovering); } .sev-none { color: var(--muted); }
+  .meaning { margin: 6px 0 0; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .progress > div { height: 100%; background: var(--recovering); }
+  .incline { margin-top: 10px; padding: 8px 10px; background: var(--panel2); border-radius: 6px; font-size: 13px; overflow-wrap: anywhere; }
+  .action { background: var(--panel2); border-left: 3px solid var(--degraded); padding: 8px 10px; border-radius: 4px; margin-top: 8px; }
+  .action.calm { border-left-color: var(--recovering); }
+  .action b { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  details.more { margin-top: 10px; } details.more summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 13px; margin: 8px 0 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-family: var(--mono); overflow-wrap: anywhere; }
+  /* checks */
+  .tableWrap { width: 100%; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td.num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+  .st-ok { color: var(--muted); } .st-act { color: var(--degraded); font-weight: 600; } .st-sev { color: var(--untrusted); font-weight: 700; }
+  @media (max-width: 640px) { .opt { display: none; } th, td { padding: 5px 4px; } }
+  button.help { padding: 0 6px; margin-left: 4px; border-radius: 50%; font-size: 11px; line-height: 16px; color: var(--muted); }
+  tr.helprow td { color: #c7cdd6; background: var(--panel2); font-size: 12px; }
+  /* chart */
+  canvas { width: 100%; height: 170px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+  .legend span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .legend i { display: inline-block; width: 12px; height: 3px; margin-right: 4px; vertical-align: middle; }
+  .legend i.band { height: 10px; width: 10px; border-radius: 2px; }
+  /* incidents */
+  .inc { border: 1px solid var(--line); border-left-width: 4px; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+  .inc.l-active { border-left-color: var(--degraded); } .inc.l-recovering { border-left-color: var(--recovering); }
+  .inc.l-resolved { border-left-color: var(--healthy); } .inc.l-unverified { border-left-color: var(--muted); }
+  .inc .head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .inc .head .cat { font-weight: 600; }
+  .inc .when { font-size: 12px; color: var(--muted); }
+  .inc .act1 { margin-top: 6px; font-size: 13px; }
+  .inc summary { cursor: pointer; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  .pill { font-size: 11px; padding: 1px 7px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+  .l-active .lc, .lc.l-active { color: var(--degraded); } .lc.l-recovering { color: var(--recovering); } .lc.l-resolved { color: var(--healthy); } .lc.l-unverified { color: var(--muted); }
+  .inc ul { margin: 6px 0; padding-left: 18px; font-family: var(--mono); font-size: 12px; color: #c7cdd6; overflow-wrap: anywhere; }
+  .inc img { max-width: 100%; border-radius: 4px; margin-top: 6px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .muted { color: var(--muted); } .note { font-size: 12px; color: var(--muted); }
+  .full { grid-column: 1 / -1; }
+  .mono { font-family: var(--mono); }
+  a { color: #79c0ff; }
+  .err-inline { color: #ff8e8e; font-size: 12.5px; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; width: min(900px, 94vw); max-height: 86vh; padding: 0; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog .dh { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); gap: 8px; }
+  dialog pre { margin: 0; padding: 12px 16px; max-height: 70vh; overflow: auto; font: 12px/1.4 var(--mono); background: #0b0e12; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>SENTINEL</h1>
+  <span class="tag">local prototype · CPU · not GPU/PipeGen validated</span>
+  <div class="controls" role="group" aria-label="Playback controls">
+    <label for="videoSel" class="sr-only">Input video or camera</label>
+    <select id="videoSel"></select>
+    <label class="note" for="realtime"><input type="checkbox" id="realtime" checked aria-label="Play files in real time"> real-time</label>
+    <button class="primary" id="runBtn" type="button">Run / replay</button>
+    <button id="pauseBtn" type="button" disabled>Pause</button>
+    <button id="stopBtn" type="button" disabled>Stop</button>
+    <label for="runSel" class="sr-only">Run to inspect</label>
+    <select id="runSel"></select>
+  </div>
+  <span id="runStatus" class="note" role="status">loading…</span>
+</header>
+<div class="banners" id="banners" aria-live="polite"><div class="banner info">Loading dashboard…</div></div>
+<main>
+  <section class="panel" aria-labelledby="h-video">
+    <h2 id="h-video">Video preview <span id="inputBadge"></span></h2>
+    <div class="videoBox">
+      <img id="video" alt="Annotated video preview: health state overlay on the monitored stream">
+      <div id="videoMsg">No frames yet. Choose an input and press <b>&nbsp;Run / replay</b>.</div>
+    </div>
+    <p class="note" style="margin:8px 0 0">Applied demo transform (ground truth from manifest): <span id="scenario" class="mono">–</span></p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-health">
+    <h2 id="h-health">Camera health</h2>
+    <div id="healthLive" aria-live="polite" aria-atomic="true">
+      <div class="hs-top"><span class="state" id="state">–</span><span class="chip sev-none" id="sevChip">no data</span></div>
+      <p class="meaning" id="meaning">No measurements yet.</p>
+      <div id="progressBox"></div>
+    </div>
+    <div class="incline" id="incLine">No open incident.</div>
+    <div id="actionBox"></div>
+    <details class="more">
+      <summary>Stream details</summary>
+      <dl class="kv">
+        <dt>Stream</dt><dd id="stream">–</dd>
+        <dt>Run</dt><dd id="runId">–</dd>
+        <dt>Stream time</dt><dd id="t">–</dd>
+        <dt>Brightness</dt><dd id="bright">–</dd>
+        <dt>Sharpness</dt><dd id="sharp">–</dd>
+        <dt>Resolution</dt><dd id="res">–</dd>
+        <dt>Processing time</dt><dd id="lat">–</dd>
+        <dt>Corrupt frames</dt><dd id="corrupt">–</dd>
+        <dt>MQTT</dt><dd id="mqtt">–</dd>
+      </dl>
+    </details>
+  </section>
+
+  <section class="panel" aria-labelledby="h-checks">
+    <h2 id="h-checks">Input-quality checks</h2>
+    <div class="tableWrap">
+      <table>
+        <caption class="sr-only">Smoothed value of each check compared with its thresholds</caption>
+        <thead><tr><th scope="col">Check</th><th scope="col">Now</th><th scope="col">Fires when</th><th scope="col" class="opt">Clears at</th><th scope="col" class="opt">Severe</th><th scope="col">Status</th></tr></thead>
+        <tbody id="checks"><tr><td colspan="6" class="muted">No measurements yet.</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note">These are <b>proxy measurements of the camera input</b> compared with a healthy baseline. A firing check means the input changed. It does not prove the detector became less accurate. Press <b>?</b> for what each check measures.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-det">
+    <h2 id="h-det">Object detection</h2>
+    <div id="detBox"><p class="muted">–</p></div>
+    <h2 style="margin-top:14px" id="h-trend">Trend · last 30 s of stream time</h2>
+    <canvas id="chart" role="img" aria-labelledby="h-trend" aria-describedby="chartSummary"></canvas>
+    <p id="chartSummary" class="sr-only">No data yet.</p>
+    <div class="legend" aria-hidden="true">
+      <span><i style="background:#f0a020"></i>brightness ratio</span>
+      <span><i style="background:#3d9df3"></i>sharpness ratio</span>
+      <span><i style="background:#a371f7"></i>framing similarity</span>
+      <span><i style="background:#e5484d"></i>obstruction fraction</span>
+      <span><i style="background:repeating-linear-gradient(90deg,#c7cdd6 0 3px,transparent 3px 6px)"></i>fire threshold (same colour)</span>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><i class="band" style="background:#3fb95040"></i>healthy</span>
+      <span><i class="band" style="background:#f0a02060"></i>degraded</span>
+      <span><i class="band" style="background:#e5484d60"></i>untrusted</span>
+      <span><i class="band" style="background:#3d9df360"></i>recovering</span>
+    </div>
+    <p class="note">The y-axis is unitless: ratios to the baseline (1.0 = baseline) and fractions from 0 to 1. Processing time (ms) is in the checks table and is not plotted. Gaps in a line mean no data.</p>
+  </section>
+
+  <section class="panel full" aria-labelledby="h-inc">
+    <h2 id="h-inc">Incident history <span class="muted" id="incCount"></span></h2>
+    <div class="tools">
+      <label for="statusFilter" class="sr-only">Filter incidents by status</label>
+      <select id="statusFilter">
+        <option value="">all statuses</option><option value="open">open (active or recovering)</option>
+        <option value="recovering">recovering</option><option value="resolved">resolved</option><option value="unverified">unverified</option>
+      </select>
+      <a id="dlLink" href="/api/incidents/download">Download JSON</a>
+      <a id="evLink" href="/api/events" target="_blank" rel="noopener">Event feed</a>
+      <a href="/api/schema" target="_blank" rel="noopener">Schema</a>
+      <form id="findForm" class="row" style="gap:6px">
+        <label for="findId" class="sr-only">Find incident by ID</label>
+        <input type="text" id="findId" placeholder="INC-… ID" autocomplete="off" spellcheck="false" size="16">
+        <button type="submit">Find</button>
+        <span id="findMsg" class="err-inline" role="alert"></span>
+      </form>
+    </div>
+    <p class="note">Findings are <b>suspected input degradation</b> measured against a healthy baseline. They do not prove that detection accuracy dropped, and they do not identify the physical cause. <b>Recovering</b> means the checks have cleared and Sentinel is waiting for the configured clean-footage period before marking the incident resolved.</p>
+    <div id="incidents"><span class="muted">No incidents in this run.</span></div>
+  </section>
+</main>
+<dialog id="jsonDlg" aria-labelledby="jsonTitle">
+  <div class="dh"><b id="jsonTitle">JSON</b><button id="jsonClose" type="button">Close</button></div>
+  <pre id="jsonBody" tabindex="0"></pre>
+</dialog>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "–" : Number(v).toFixed(d);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const INPUT_LABEL = {
+  synthetic_demo: ["SYNTHETIC DEMO FOOTAGE", "b-synthetic"],
+  derived_demo: ["DEMO TRANSFORMS OF YOUR FOOTAGE", "b-synthetic"],
+  video_file: ["REAL VIDEO FILE · unvalidated", "b-real"],
+  camera: ["LIVE CAMERA · unvalidated", "b-real"],
+  network_stream: ["NETWORK STREAM · unvalidated", "b-real"],
+};
+const CAT_LABEL = {low_light: "low light", blur: "blur", obstruction: "obstruction", framing_change: "framing change", processing_latency: "processing latency"};
+const catText = (cs) => (cs && cs.length) ? cs.map(c => CAT_LABEL[c] || c).join(", ") : "unclassified";
+// What each check measures, generated from the live thresholds so the text never drifts from the config.
+const CHECK_INFO = {
+  brightness: { name: "Brightness ratio", unit: "", digits: 2,
+    help: (c) => `Mean frame brightness divided by the healthy baseline (1.00 = same as baseline). Fires below ${fmt(c.enter_threshold)}, clears again at ${fmt(c.exit_threshold)} or above, severe below ${fmt(c.severe_threshold)}. Low values suggest low light or an exposure problem. Global measure: a bright spot can hide local darkness.` },
+  sharpness: { name: "Sharpness ratio", unit: "", digits: 2,
+    help: (c) => `Fine edge detail (Laplacian variance divided by image variance) relative to the baseline. Fires below ${fmt(c.enter_threshold)}, clears at ${fmt(c.exit_threshold)}, severe below ${fmt(c.severe_threshold)}. Low values suggest blur, focus drift or a dirty lens. Heavy sensor noise can hide blur.` },
+  obstruction: { name: "Obstruction fraction", unit: "", digits: 2,
+    help: (c) => `Share of the image grid that has lost the texture it had in the baseline (0 = none, 1 = all). Fires above ${fmt(c.enter_threshold)}, clears at ${fmt(c.exit_threshold)}, severe above ${fmt(c.severe_threshold)}. Suggests something flat covering part of the view. Textured objects (a hand, leaves) may be missed.` },
+  framing: { name: "Framing similarity", unit: "", digits: 2,
+    help: (c) => `How closely the overall view matches the baseline view (1.00 = identical layout). Fires below ${fmt(c.enter_threshold)}, clears at ${fmt(c.exit_threshold)}, severe below ${fmt(c.severe_threshold)}. Suggests the camera moved or zoomed. Large scene changes (crowds, parked vehicles) can also lower it.` },
+  latency: { name: "Processing time", unit: " ms", digits: 0,
+    help: (c) => `Sentinel's own processing time per frame in milliseconds. Fires above ${fmt(c.enter_threshold, 0)} ms, clears at ${fmt(c.exit_threshold, 0)} ms, severe above ${fmt(c.severe_threshold, 0)} ms. This is not camera, network or model latency.` },
+};
+let videos = [], viewRun = "", lastIncKey = "", currentRunId = null, connected = null, latestRunId = null;
+let openHelp = new Set(), flashes = [], lastStatus = null;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  let body = null;
+  try { body = await r.json(); } catch (_) {}
+  if (!r.ok) throw new Error((body && body.detail) || `HTTP ${r.status}`);
+  return body;
+}
+function flash(cls, html) { flashes.push({cls, html, until: Date.now() + 8000}); }
+function banners(items) {
+  flashes = flashes.filter(f => f.until > Date.now());
+  const all = flashes.map(f => [f.cls, f.html]).concat(items);
+  const html = all.map(([cls, h]) => `<div class="banner ${cls}"${cls === "err" ? ' role="alert"' : ""}>${h}</div>`).join("");
+  if ($("banners").innerHTML !== html) $("banners").innerHTML = html;
+}
+
+async function loadVideos() {
+  videos = await api("/api/videos");
+  const opts = videos.map(v => `<option value="${esc(v.name)}">${esc(v.name)}</option>`);
+  opts.push('<option value="0">USB camera 0 (live)</option>');
+  $("videoSel").innerHTML = opts.join("");
+  const demo = videos.find(v => v.name === "demo_timeline.mp4");
+  if (demo) $("videoSel").value = demo.name;
+}
+async function loadRuns() {
+  const runs = await api("/api/runs");
+  latestRunId = runs.length ? runs[0].run_id : null;
+  const sel = $("runSel"), keep = sel.value;
+  sel.innerHTML = '<option value="">view: current / latest run</option>' + runs.map(r =>
+    `<option value="${esc(r.run_id)}">${esc(r.run_id)} · ${esc(r.input_kind || "?")} · ${r.incidents} incident${r.incidents === 1 ? "" : "s"}${r.complete ? "" : r.live ? " · live" : " · incomplete"}</option>`).join("");
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
+function startPreview() {
+  $("videoMsg").textContent = "Connecting to the video stream…";
+  $("videoMsg").style.display = "flex";
+  $("video").src = "/api/stream.mjpg?ts=" + Date.now();
+}
+$("video").addEventListener("load", () => { $("videoMsg").style.display = "none"; });
+$("video").addEventListener("error", () => {
+  $("video").removeAttribute("src");
+  $("videoMsg").style.display = "flex";
+  $("videoMsg").textContent = connected === false
+    ? "Video preview unavailable: the Sentinel server is unreachable."
+    : "Video preview could not be loaded (the stream ended or failed). Press Run / replay to start it again.";
+});
+
+$("runBtn").onclick = async () => {
+  $("runBtn").disabled = true;
+  try {
+    const r = await api("/api/run", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({video: $("videoSel").value, realtime: $("realtime").checked})});
+    $("runSel").value = ""; viewRun = ""; lastIncKey = "";
+    currentRunId = r.run_id;
+    startPreview();
+    loadRuns().catch(() => {});
+  } catch (e) { flash("err", "Could not start the run: " + esc(e.message)); }
+  finally { $("runBtn").disabled = false; }
+};
+$("pauseBtn").onclick = async () => {
+  const resume = $("pauseBtn").textContent === "Resume";
+  try { await api(resume ? "/api/resume" : "/api/pause", {method: "POST"}); }
+  catch (e) { flash("err", `Could not ${resume ? "resume" : "pause"}: ` + esc(e.message)); }
+};
+$("stopBtn").onclick = () => api("/api/stop", {method: "POST"}).catch(e => flash("err", "Could not stop: " + esc(e.message)));
+$("runSel").onchange = () => { viewRun = $("runSel").value; lastIncKey = ""; refreshIncidents(); };
+$("statusFilter").onchange = () => { lastIncKey = ""; refreshIncidents(); };
+$("jsonClose").onclick = () => $("jsonDlg").close();
+let dlgReturn = null;
+function showJson(title, obj) {
+  dlgReturn = document.activeElement;
+  $("jsonTitle").textContent = title; $("jsonBody").textContent = JSON.stringify(obj, null, 2);
+  $("jsonDlg").showModal(); $("jsonClose").focus();
+}
+$("jsonDlg").addEventListener("close", () => { if (dlgReturn && dlgReturn.focus) dlgReturn.focus(); });
+$("findForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const id = $("findId").value.trim();
+  $("findMsg").textContent = "";
+  if (!id) { $("findMsg").textContent = "Enter an incident ID."; return; }
+  try {
+    const r = await api("/api/incidents/" + encodeURIComponent(id));
+    showJson(`${r.incident.incident_id} · run ${r.run_id}`, r.incident);
+  } catch (e) { $("findMsg").textContent = e.message === "unknown incident" ? `No incident with ID ${id} in any run.` : "Lookup failed: " + e.message; }
+};
+
+function scenarioAt(t) {
+  const v = videos.find(v => v.name === $("videoSel").value);
+  const segs = v && v.segments;
+  if (!segs || t === null || t === undefined) return "– (not a demo clip)";
+  const s = segs.find(s => t >= s.start_s && t < s.end_s);
+  return s ? `${s.scenario} (${s.start_s}–${s.end_s} s)` : "–";
+}
+
+// ---- lifecycle helpers: one place that maps engine/incident data to what operators see
+function lifecycle(i) {
+  if (i.status === "active" && i.health_state === "RECOVERING") return "recovering";
+  return i.status;  // active | resolved | unverified
+}
+const LIFE_TEXT = {active: "active", recovering: "recovering", resolved: "resolved", unverified: "unverified"};
+function severityFor(state) {
+  return {HEALTHY: ["ok", "OK"], DEGRADED: ["warning", "Warning"], UNTRUSTED: ["critical", "Critical"], RECOVERING: ["verifying", "Verifying"]}[state] || ["none", "no data"];
+}
+function wallTime(iso) {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+}
+function bar(frac) { return `<div class="progress" aria-hidden="true"><div style="width:${Math.max(0, Math.min(1, frac)) * 100}%"></div></div>`; }
+
+function renderHealth(s) {
+  const f = s.frame, h = s.health, inc = s.active_incident;
+  if (!f || !h) {
+    $("state").textContent = "–"; $("state").className = "state";
+    $("sevChip").className = "chip sev-none"; $("sevChip").textContent = "no data";
+    $("meaning").textContent = "No measurements yet. Start a run to monitor a stream.";
+    $("progressBox").innerHTML = ""; $("incLine").textContent = "No open incident."; $("actionBox").innerHTML = "";
+    return;
+  }
+  const [sevCls, sevText] = severityFor(f.state);
+  $("state").textContent = f.state; $("state").className = "state s-" + f.state;
+  $("sevChip").className = "chip sev-" + sevCls; $("sevChip").textContent = sevText;
+  const cats = catText(f.suspected_categories);
+  let meaning = "", prog = "";
+  if (f.state === "HEALTHY" && h.pending.length) {
+    const p = h.pending.reduce((a, b) => (b.held_s > a.held_s ? b : a));
+    meaning = `Input matches the baseline, but ${h.pending.map(x => esc(CHECK_INFO[x.check]?.name || x.check).toLowerCase()).join(", ")} is out of range. Confirming before raising an incident (${fmt(p.held_s, 1)} / ${fmt(p.needed_s, 1)} s).`;
+    prog = bar(p.held_s / p.needed_s);
+  } else if (f.state === "HEALTHY") {
+    meaning = "Input matches the healthy baseline. No checks are out of range.";
+  } else if (f.state === "DEGRADED") {
+    meaning = `Input quality is degraded (suspected ${esc(cats)}). Detections from this camera may be less reliable.`;
+    if (h.escalation) meaning += ` Escalates to UNTRUSTED if it lasts ${fmt(h.escalation.escalate_after_s, 0)} s (now ${fmt(h.escalation.degraded_for_s, 1)} s), or sooner if it becomes severe.`;
+  } else if (f.state === "UNTRUSTED") {
+    meaning = `Severe input degradation (suspected ${esc(cats)}). Treat detections from this camera as untrusted until recovery is verified.`;
+  } else if (f.state === "RECOVERING" && h.recovery) {
+    meaning = `All checks are back within limits. Verifying recovery: ${fmt(h.recovery.clear_for_s, 1)} / ${fmt(h.recovery.needed_s, 1)} s of clean footage. Any relapse reopens the degraded state.`;
+    prog = bar(h.recovery.clear_for_s / h.recovery.needed_s);
+  }
+  $("meaning").innerHTML = meaning; $("progressBox").innerHTML = prog;
+  if (inc) {
+    const life = lifecycle(inc);
+    $("incLine").innerHTML = `<span class="pill lc l-${life}">${LIFE_TEXT[life]}</span> Incident <span class="mono">${esc(inc.incident_id)}</span> · ${esc(catText(inc.categories_seen))} · peak ${esc(inc.peak_severity)} · opened t=${fmt(inc.opened_stream_time_s, 1)} s (${esc(wallTime(inc.opened_at))})`;
+    $("actionBox").innerHTML = life === "recovering"
+      ? `<div class="action calm"><b>Operator action</b>No new action needed. Keep downstream consumers in untrusted mode until the incident is resolved. If the condition returns, follow: ${esc(inc.recommended_actions[0] || "")}</div>`
+      : inc.recommended_actions.map(a => `<div class="action"><b>Recommended operator action</b>${esc(a)}</div>`).join("");
+  } else {
+    $("incLine").textContent = h.pending.length ? "No open incident yet (still confirming)." : "No open incident.";
+    $("actionBox").innerHTML = "";
+  }
+}
+
+function renderChecks(f) {
+  if (!f) { $("checks").innerHTML = '<tr><td colspan="6" class="muted">No measurements yet.</td></tr>'; return; }
+  $("checks").innerHTML = f.checks.map(c => {
+    const info = CHECK_INFO[c.check] || {name: c.check, unit: "", digits: 2, help: () => ""};
+    const d = info.digits, u = info.unit, op = c.direction === "below" ? "&lt;" : "&gt;";
+    const st = c.severe ? ["st-sev", "severe"] : c.active ? ["st-act", "out of range"] : ["st-ok", "ok"];
+    const hid = "help-" + c.check, open = openHelp.has(c.check);
+    return `<tr><th scope="row" style="font-weight:500;color:var(--text)">${esc(info.name)}<button class="help" type="button" aria-expanded="${open}" aria-controls="${hid}" aria-label="What is ${esc(info.name)}?" data-help="${esc(c.check)}">?</button></th>
+      <td class="num">${fmt(c.value, d)}${u}</td><td class="num">${op} ${fmt(c.enter_threshold, d)}${u}</td>
+      <td class="num opt">${fmt(c.exit_threshold, d)}${u}</td><td class="num opt">${op} ${fmt(c.severe_threshold, d)}${u}</td>
+      <td class="${st[0]}">${st[1]}</td></tr>` +
+      (open ? `<tr class="helprow" id="${hid}"><td colspan="6">${esc(info.help(c))}</td></tr>` : "");
+  }).join("");
+}
+$("checks").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-help]");
+  if (!b) return;
+  const k = b.dataset.help;
+  openHelp.has(k) ? openHelp.delete(k) : openHelp.add(k);
+  renderChecks(lastStatus && lastStatus.frame);
+  const again = document.querySelector(`button[data-help="${CSS.escape(k)}"]`);
+  if (again) again.focus();
+});
+
+function renderDetections(s) {
+  const f = s.frame;
+  if (!s.detector || s.detector === "none") {
+    $("detBox").innerHTML = `<p style="margin:0"><b>Object detection unavailable — health monitoring only.</b></p>
+      <p class="note">No detector or validated detections file is configured, so no boxes are drawn and no detection statistics are shown. Nothing is simulated.</p>`;
+    return;
+  }
+  const d = f && f.detection;
+  $("detBox").innerHTML = `<dl class="kv"><dt>Detector</dt><dd>${esc(s.detector)}</dd>` + (d
+    ? `<dt>Source</dt><dd>${esc(d.source === "external_pipeline" ? "external pipeline (validated file)" : "ran in Sentinel")}</dd><dt>This frame</dt><dd>${d.count} detection${d.count === 1 ? "" : "s"}${d.count ? ` · mean confidence ${fmt(d.mean_confidence, 2)}` : ""}</dd><dt>By label</dt><dd>${esc(Object.entries(d.by_label).map(([k, v]) => `${k}: ${v}`).join(", ") || "–")}</dd>`
+    : `<dt>This frame</dt><dd>no detection data for this frame</dd>`) + `</dl>`;
+}
+
+// ---- trend chart
+const SERIES = [["brightness", "#f0a020"], ["sharpness", "#3d9df3"], ["framing", "#a371f7"], ["obstruction", "#e5484d"]];
+const BAND = {HEALTHY: "#3fb95026", DEGRADED: "#f0a02055", UNTRUSTED: "#e5484d55", RECOVERING: "#3d9df355"};
+function drawChart(series, checks) {
+  const c = $("chart"), ctx = c.getContext("2d"), dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, H = 170;
+  c.width = W * dpr; c.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.font = "11px system-ui, sans-serif"; ctx.fillStyle = "#9aa4b2";
+  if (!series.length) { ctx.fillText("No data yet", 8, 20); $("chartSummary").textContent = "No data yet."; return; }
+  const L = 34, R = 8, T = 8, B = 22, pw = W - L - R, ph = H - T - B, YMAX = 1.2;
+  const t1 = series[series.length - 1].t, t0 = t1 - 30;
+  const x = (t) => L + (t - t0) / 30 * pw, y = (v) => T + ph - Math.max(0, Math.min(YMAX, v)) / YMAX * ph;
+  // state bands
+  for (let i = 1; i < series.length; i++) {
+    if (series[i].t < t0) continue;
+    ctx.fillStyle = BAND[series[i].state] || "transparent";
+    const xa = Math.max(L, x(series[i - 1].t));
+    ctx.fillRect(xa, T, x(series[i].t) - xa + 1, ph);
+  }
+  // axes and grid
+  ctx.strokeStyle = "#ffffff22"; ctx.lineWidth = 1; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  ctx.fillStyle = "#c7cdd6";  // reset: the band loop left a translucent fill colour
+  for (const v of [0, 0.5, 1.0]) {
+    ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(L + pw, y(v)); ctx.stroke();
+    ctx.fillText(v.toFixed(1), L - 4, y(v));
+  }
+  ctx.textAlign = "left"; ctx.fillText("1.0 = baseline", L + 4, y(1.0) - 7);
+  ctx.textBaseline = "top"; ctx.textAlign = "center";
+  for (let k = 0; k <= 3; k++) {
+    const tt = t0 + k * 10;
+    ctx.textAlign = k === 0 ? "left" : k === 3 ? "right" : "center";
+    if (tt >= 0) ctx.fillText(`${tt.toFixed(0)} s`, x(tt), T + ph + 5);
+  }
+  // thresholds (fire level), dashed in the series colour
+  const byName = Object.fromEntries((checks || []).map(ch => [ch.check, ch]));
+  ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  for (const [key, col] of SERIES) {
+    const ch = byName[key];
+    if (!ch || ch.enter_threshold > YMAX || ch.enter_threshold < 0) continue;
+    ctx.strokeStyle = col + "aa"; ctx.beginPath(); ctx.moveTo(L, y(ch.enter_threshold)); ctx.lineTo(L + pw, y(ch.enter_threshold)); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // series: break the line on missing values or gaps (no interpolation across missing data)
+  const gap = 0.5;
+  for (const [key, col] of SERIES) {
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+    let prev = null;
+    for (const p of series) {
+      const v = p[key];
+      if (p.t < t0 || v === null || v === undefined || Number.isNaN(v)) { prev = null; continue; }
+      if (prev === null || p.t - prev > gap) ctx.moveTo(x(p.t), y(v)); else ctx.lineTo(x(p.t), y(v));
+      prev = p.t;
+    }
+    ctx.stroke();
+  }
+  const last = series[series.length - 1];
+  $("chartSummary").textContent = `At stream time ${last.t.toFixed(1)} s the state is ${last.state}: brightness ratio ${fmt(last.brightness)}, sharpness ratio ${fmt(last.sharpness)}, framing similarity ${fmt(last.framing)}, obstruction fraction ${fmt(last.obstruction)}.`;
+}
+
+// ---- incidents
+async function refreshIncidents() {
+  const filter = $("statusFilter").value;
+  const q = new URLSearchParams();
+  if (viewRun) q.set("run_id", viewRun);
+  if (filter === "resolved" || filter === "unverified") q.set("status", filter);
+  if (filter === "open" || filter === "recovering") q.set("status", "active");
+  $("dlLink").href = "/api/incidents/download" + (viewRun ? "?run_id=" + encodeURIComponent(viewRun) : "");
+  $("evLink").href = "/api/events" + (viewRun ? "?run_id=" + encodeURIComponent(viewRun) : "");
+  let incs;
+  try { incs = await api("/api/incidents?" + q); }
+  catch (e) { $("incidents").innerHTML = `<p class="err-inline" role="alert">Could not load incidents: ${esc(e.message)}</p>`; lastIncKey = ""; return; }
+  if (filter === "recovering") incs = incs.filter(i => lifecycle(i) === "recovering");
+  const key = JSON.stringify(incs.map(i => [i.incident_id, i.status, i.health_state, i.evidence.length])) + viewRun + filter;
+  if (key === lastIncKey) return;
+  lastIncKey = key;
+  const runForEvidence = viewRun || currentRunId || latestRunId;
+  const open = new Set([...document.querySelectorAll("#incidents details[open]")].map(d => d.dataset.id));
+  $("incCount").textContent = `(${incs.length})`;
+  if (!incs.length) { $("incidents").innerHTML = `<p class="muted">${filter ? "No incidents match this filter." : "No incidents in this run."}</p>`; return; }
+  window._incs = incs;
+  $("incidents").innerHTML = incs.slice().reverse().map((i, n) => {
+    const life = lifecycle(i), idx = incs.length - 1 - n;
+    const dur = i.resolved_stream_time_s !== null ? `${fmt(i.resolved_stream_time_s - i.opened_stream_time_s, 1)} s` : "ongoing";
+    return `<article class="inc l-${life}" aria-label="Incident ${esc(i.incident_id)}, ${LIFE_TEXT[life]}">
+      <div class="head">
+        <span class="pill lc l-${life}">${LIFE_TEXT[life]}</span>
+        <span class="chip sev-${esc(i.peak_severity)}" title="peak severity">${esc(i.peak_severity)}</span>
+        <span class="cat">${esc(catText(i.categories_seen))}</span>
+        <span class="s-${esc(i.health_state)}">${esc(i.health_state)}</span>
+        ${i.recurrence_of ? `<span class="pill lc l-active">recurrence #${i.recurrence_count + 1}</span>` : ""}
+      </div>
+      <div class="when">Opened ${esc(wallTime(i.opened_at))} (stream ${fmt(i.opened_stream_time_s, 1)} s)${i.resolved_at ? ` · resolved ${esc(wallTime(i.resolved_at))} (stream ${fmt(i.resolved_stream_time_s, 1)} s)` : ""} · duration ${dur} · <span class="mono">${esc(i.incident_id)}</span> · ${esc(i.stream_id)}</div>
+      <div class="act1"><b>Action:</b> ${esc(i.recommended_actions[0] || "–")}</div>
+      <details data-id="${esc(i.incident_id)}" ${open.has(i.incident_id) ? "open" : ""}>
+        <summary>Evidence, measurements and snapshot</summary>
+        ${i.recommended_actions.length > 1 ? `<div><b>All recommended actions</b><ul>${i.recommended_actions.map(a => `<li>${esc(a)}</li>`).join("")}</ul></div>` : ""}
+        <div><b>Evidence</b><ul>${i.evidence.map(e => `<li>${esc(e)}</li>`).join("")}</ul></div>
+        <div><b>Worst values</b> <span class="mono">${esc(Object.entries(i.worst_values).map(([k, v]) => `${k} ${fmt(v)}`).join(" · ") || "–")}</span></div>
+        ${i.detection_context && i.detection_context.during.frames_with_detection_data ? `<div><b>Detections</b><ul><li>before onset: ${esc(ctxLine(i.detection_context.before))}</li><li>during: ${esc(ctxLine(i.detection_context.during))}</li></ul></div>` : ""}
+        <button type="button" data-json="${idx}">View JSON</button>
+        ${i.snapshot_path && runForEvidence ? `<div><img loading="lazy" src="/api/evidence/${encodeURIComponent(runForEvidence)}/${encodeURIComponent(i.incident_id)}.jpg" alt="Camera frame captured when incident ${esc(i.incident_id)} opened"></div>` : ""}
+      </details>
+    </article>`;
+  }).join("");
+  document.querySelectorAll("#incidents button[data-json]").forEach(b => b.onclick = () => {
+    const inc = window._incs[Number(b.dataset.json)]; showJson(inc.incident_id, inc);
+  });
+  document.querySelectorAll("#incidents img").forEach(img => img.addEventListener("error", () => {
+    img.replaceWith(Object.assign(document.createElement("p"), {className: "note", textContent: "Snapshot image could not be loaded."}));
+  }));
+}
+function ctxLine(w) {
+  if (!w) return "–";
+  return `${w.frames} frames, ${w.frames_with_detection_data} with detection data, mean ${fmt(w.mean_detections_per_frame, 2)} per frame`;
+}
+
+function renderStatus(s) {
+  lastStatus = s;
+  const msgs = [];
+  if (!videos.length) msgs.push(["warn", "No demo clips found. Generate them with <code>.venv\\Scripts\\python -m sentinel make-demo</code>, then reload."]);
+  if (!s.baseline.ok) msgs.push(["err", `No usable baseline: ${esc(s.baseline.error)}. Run <code>python -m sentinel make-demo</code> or <code>python -m sentinel baseline &lt;healthy video&gt;</code>.`]);
+  for (const w of (s.baseline.warnings || [])) msgs.push(["warn", "Baseline warning: " + esc(w)]);
+  if (s.run_status === "error") msgs.push(["err", "Run failed: " + esc(s.error)]);
+  if (s.resolution_mismatch) msgs.push(["warn", `Input resolution ${s.resolution_mismatch.join("×")} differs from the baseline; re-baseline this camera.`]);
+  if (s.mqtt.enabled && s.mqtt.state !== "connected") msgs.push(["warn", `MQTT ${esc(s.mqtt.state)}${s.mqtt.last_error ? ": " + esc(s.mqtt.last_error) : ""} (monitoring continues).`]);
+  if (s.run_status === "idle" && !s.frame && videos.length && s.baseline.ok) msgs.push(["info", "Idle. Choose an input and press <b>Run / replay</b>. Past runs stay available in the run selector."]);
+  banners(msgs);
+
+  currentRunId = s.run_id;
+  $("runStatus").textContent = `${s.run_status}${s.video ? " · " + s.video : ""}`;
+  const active = ["starting", "running", "paused"].includes(s.run_status);
+  $("pauseBtn").disabled = !["running", "paused"].includes(s.run_status);
+  $("pauseBtn").textContent = s.run_status === "paused" ? "Resume" : "Pause";
+  $("pauseBtn").setAttribute("aria-pressed", String(s.run_status === "paused"));
+  $("stopBtn").disabled = !active;
+  $("stream").textContent = s.stream_id; $("runId").textContent = s.run_id || "–";
+  $("corrupt").textContent = s.frame ? s.corrupt_frames : "–";
+  $("mqtt").textContent = s.mqtt.enabled ? `${s.mqtt.state} · ${s.mqtt.published} sent, ${s.mqtt.failed} failed` : "disabled";
+  const lbl = INPUT_LABEL[s.input_kind];
+  $("inputBadge").innerHTML = lbl ? `<span class="badge ${lbl[1]}">${lbl[0]}</span>` : "";
+  if (s.frame && !$("video").getAttribute("src") && active) startPreview();
+  if (!s.frame && !$("video").getAttribute("src")) { $("videoMsg").style.display = "flex"; }
+
+  const f = s.frame;
+  renderHealth(s); renderChecks(f); renderDetections(s);
+  if (!f) { drawChart([], []); return; }
+  $("t").textContent = f.t.toFixed(2) + " s";
+  $("bright").textContent = `${fmt(f.metrics.brightness, 1)} / 255 (dark pixels ${fmt(f.metrics.dark_fraction * 100, 1)}%)`;
+  $("sharp").textContent = fmt(f.metrics.sharpness, 3) + " (normalised Laplacian variance)";
+  $("res").textContent = `${f.metrics.width}×${f.metrics.height}`;
+  $("lat").textContent = fmt(f.latency_ms, 1) + " ms per frame";
+  $("scenario").textContent = scenarioAt(f.t);
+  drawChart(s.series, f.checks);
+}
+
+async function tick() {
+  let s;
+  try {
+    s = await api("/api/status");
+  } catch (e) {
+    connected = false;
+    banners([["err", "Disconnected from the Sentinel server. Retrying every second… (start it with <code>.venv\\Scripts\\python -m sentinel serve</code>)"]]);
+    $("runStatus").textContent = "disconnected";
+    setTimeout(tick, 1000);
+    return;
+  }
+  try {
+    if (connected === false) { await loadVideos(); await loadRuns(); flash("info", "Reconnected to the Sentinel server."); }
+    connected = true;
+    renderStatus(s);
+    if (!viewRun) await refreshIncidents();
+    if (["finished", "stopped", "error"].includes(s.run_status) && s.run_id && !tick.done?.[s.run_id]) {
+      (tick.done ||= {})[s.run_id] = true; loadRuns().catch(() => {});
+    }
+  } catch (e) {
+    console.error(e);
+    banners([["err", "Dashboard error while rendering: " + esc(e.message)]]);
+  }
+  setTimeout(tick, 500);
+}
+window.addEventListener("resize", () => { if (lastStatus && lastStatus.frame) drawChart(lastStatus.series, lastStatus.frame.checks); });
+
+(async () => {
+  try { await loadVideos(); await loadRuns(); connected = true; } catch (e) { connected = false; }
+  tick();
+})();
+</script>
+</body>
+</html>

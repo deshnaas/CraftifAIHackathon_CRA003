@@ -1,0 +1,177 @@
+{
+ "source": "synthetic (procedurally generated, deterministic seed=7)",
+ "synthetic": true,
+ "note": "Degradations are deterministic digital transforms, not physical camera faults. Results on these clips do not validate detection of real lens dirt, darkness or camera movement.",
+ "clips": [
+  {
+   "file": "clip_healthy.mp4",
+   "frames": 150,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 0.0,
+     "end_s": 10.0
+    }
+   ]
+  },
+  {
+   "file": "clip_dark.mp4",
+   "frames": 150,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "dark",
+     "transform": "dark",
+     "params": {
+      "gain": 0.22
+     },
+     "start_s": 0.0,
+     "end_s": 10.0
+    }
+   ]
+  },
+  {
+   "file": "clip_blur.mp4",
+   "frames": 150,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "blur",
+     "transform": "blur",
+     "params": {
+      "sigma": 6.0
+     },
+     "start_s": 0.0,
+     "end_s": 10.0
+    }
+   ]
+  },
+  {
+   "file": "clip_occlusion.mp4",
+   "frames": 150,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "occlusion",
+     "transform": "occlude",
+     "params": {
+      "frac_w": 0.45,
+      "frac_h": 0.6,
+      "level": 70
+     },
+     "start_s": 0.0,
+     "end_s": 10.0
+    }
+   ]
+  },
+  {
+   "file": "clip_framing_shift.mp4",
+   "frames": 150,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "framing_shift",
+     "transform": "shift",
+     "params": {
+      "dx": 0.22,
+      "dy": 0.12,
+      "zoom": 1.3
+     },
+     "start_s": 0.0,
+     "end_s": 10.0
+    }
+   ]
+  },
+  {
+   "file": "demo_timeline.mp4",
+   "frames": 1110,
+   "fps": 15.0,
+   "segments": [
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 0,
+     "end_s": 8
+    },
+    {
+     "scenario": "dark",
+     "transform": "dark",
+     "params": {
+      "gain": 0.22
+     },
+     "start_s": 8,
+     "end_s": 16
+    },
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 16,
+     "end_s": 24
+    },
+    {
+     "scenario": "blur",
+     "transform": "blur",
+     "params": {
+      "sigma": 6.0
+     },
+     "start_s": 24,
+     "end_s": 32
+    },
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 32,
+     "end_s": 40
+    },
+    {
+     "scenario": "occlusion",
+     "transform": "occlude",
+     "params": {
+      "frac_w": 0.45,
+      "frac_h": 0.6,
+      "level": 70
+     },
+     "start_s": 40,
+     "end_s": 48
+    },
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 48,
+     "end_s": 56
+    },
+    {
+     "scenario": "framing_shift",
+     "transform": "shift",
+     "params": {
+      "dx": 0.22,
+      "dy": 0.12,
+      "zoom": 1.3
+     },
+     "start_s": 56,
+     "end_s": 64
+    },
+    {
+     "scenario": "healthy",
+     "transform": null,
+     "params": {},
+     "start_s": 64,
+     "end_s": 74
+    }
+   ]
+  }
+ ],
+ "baseline": {
+  "file": "baseline_healthy.mp4",
+  "frames": 300,
+  "fps": 15.0,
+  "scenario": "healthy"
+ }
+}

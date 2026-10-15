@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sentinel.local/schema/detection_event/1.0",
+  "title": "Sentinel detection event (internal)",
+  "description": "One line of a detections JSONL file consumed by `sentinel run --detections`. This is Sentinel's own internal format. It is NOT PipeGen's output format: a converter from genuine PipeGen JSON metadata to this schema must be written once a real PipeGen output sample is available. Each record describes all detections for one frame of one stream.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "stream_id", "source", "detections"],
+  "anyOf": [{"required": ["frame_index"]}, {"required": ["timestamp_s"]}],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "stream_id": {"type": "string", "minLength": 1, "description": "Must match the Sentinel stream_id to be used."},
+    "source": {"type": "string", "minLength": 1, "description": "Producer of the detections, e.g. the name of the pipeline that ran the model."},
+    "frame_index": {"type": "integer", "minimum": 0, "description": "0-based index of the decoded frame in the source video. Preferred association key."},
+    "timestamp_s": {"type": "number", "minimum": 0, "description": "Stream time of the frame in seconds. Used when frame_index is absent; matched to the nearest frame within a tolerance."},
+    "detections": {
+      "type": "array",
+      "description": "All detections for this frame. An empty array means the detector ran and found nothing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "confidence", "bbox"],
+        "properties": {
+          "label": {"type": "string", "minLength": 1},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "bbox": {
+            "type": "array",
+            "description": "[x, y, width, height] in source-frame pixels; width and height > 0.",
+            "items": {"type": "number"},
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "track_id": {"type": ["integer", "null"]}
+        }
+      }
+    }
+  }
+}

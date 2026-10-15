@@ -1,0 +1,2 @@
+wrote 6 clips + baseline footage to data/demo (manifest.json); source: synthetic (procedurally generated, deterministic seed=7)
+baseline written to data/baseline.json (300 frames)

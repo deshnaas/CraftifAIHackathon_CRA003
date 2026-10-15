@@ -1,0 +1,5 @@
+{"schema_version": "1.0", "stream_id": "cam-01", "source": "hand_written_test_fixture_not_pipegen", "frame_index": 0, "detections": [{"label": "car", "confidence": 0.91, "bbox": [10, 20, 70, 30], "track_id": 1}]}
+{"schema_version": "1.0", "stream_id": "cam-01", "source": "hand_written_test_fixture_not_pipegen", "frame_index": 2, "timestamp_s": 0.1333, "detections": [{"label": "car", "confidence": 0.88, "bbox": [14, 20, 70, 30], "track_id": 1}, {"label": "person", "confidence": 0.55, "bbox": [300, 200, 20, 50]}]}
+{"schema_version": "1.0", "stream_id": "cam-01", "source": "hand_written_test_fixture_not_pipegen", "frame_index": 1, "detections": []}
+{"schema_version": "1.0", "stream_id": "cam-02", "source": "hand_written_test_fixture_not_pipegen", "frame_index": 0, "detections": []}
+{"schema_version": "1.0", "stream_id": "cam-01", "source": "hand_written_test_fixture_not_pipegen", "timestamp_s": 1.0, "detections": [{"label": "car", "confidence": 0.7, "bbox": [0, 0, 5, 5], "track_id": null}]}

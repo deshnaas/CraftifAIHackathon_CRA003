@@ -1,0 +1,13 @@
+# core
+numpy>=2
+opencv-python-headless>=4.10
+fastapi>=0.110
+uvicorn[standard]>=0.29
+# optional: MQTT output (disabled unless enabled in config; Sentinel runs without it)
+paho-mqtt>=2.0
+# dev / test
+pytest>=8
+jsonschema>=4
+httpx>=0.27
+ruff>=0.6
+mypy>=1.10

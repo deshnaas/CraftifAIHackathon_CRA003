@@ -1,0 +1,11 @@
+{
+ "run_id": "cli_run",
+ "stream_id": "cam-01",
+ "source": "data\\demo\\demo_timeline.mp4",
+ "input_kind": "synthetic_demo",
+ "started_at": "2026-10-15T16:33:52+00:00",
+ "detector": "none",
+ "detector_source": "none",
+ "baseline_source": "data\\demo\\baseline_healthy.mp4",
+ "baseline_warnings": []
+}
